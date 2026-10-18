@@ -40,6 +40,7 @@ jobs:
             flutter:
               sdk: flutter
             shared_preferences: ^2.2.2
+            flutter_local_notifications: ^17.0.0
 
           flutter:
             uses-material-design: true
@@ -59,11 +60,46 @@ jobs:
               return MaterialApp(
                 title: '用药助手',
                 theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.teal),
-                home: const HomePage(),
+                home: const MainScreen(),
               );
             }
           }
 
+          // --- 内置的简易药品数据库 ---
+          final List<Map<String, String>> drugDatabase = [
+            {
+              'name': '布洛芬缓释胶囊',
+              'type': '解热镇痛药',
+              'usage': '口服。成人及12岁以上儿童：一日2次（早晚各一次），一次1粒。',
+              'warning': '用于缓解轻至中度疼痛如头痛、关节痛、偏头痛、牙痛、肌肉痛、神经痛、痛经。也用于普通感冒或流行性感冒引起的发热。',
+            },
+            {
+              'name': '阿莫西林胶囊',
+              'type': '抗生素',
+              'usage': '口服。成人一次0.5g（2粒），每6-8小时一次，一日剂量不超过4g（16粒）。',
+              'warning': '适用于敏感菌（不产β内酰胺酶菌株）所致的各种感染。使用前必须做青霉素皮肤试验。',
+            },
+            {
+              'name': '感冒灵颗粒',
+              'type': '中成药',
+              'usage': '开水冲服，一次10克（1袋），一日3次。',
+              'warning': '解热镇痛。用于感冒引起的头痛，发热，鼻塞，流涕，咽痛。服药期间不得饮酒。',
+            },
+            {
+              'name': '蒙脱石散',
+              'type': '止泻药',
+              'usage': '口服，成人一次1袋（3克），一日3次。倒入半杯温开水（约50毫升）中混匀快速服完。',
+              'warning': '用于成人及儿童急、慢性腹泻。治疗急性腹泻时，应注意纠正脱水。',
+            },
+            {
+              'name': '奥美拉唑肠溶胶囊',
+              'type': '抑酸药',
+              'usage': '口服，不可咀嚼。消化性溃疡：一次20mg（1粒），一日1-2次。',
+              'warning': '适用于胃溃疡、十二指肠溃疡、应激性溃疡、反流性食管炎等。',
+            }
+          ];
+
+          // --- 数据模型 ---
           class Med {
             String id;
             String name;
@@ -73,12 +109,7 @@ jobs:
             Med({required this.id, required this.name, required this.dose, required this.frequency, this.takenToday = false});
 
             Map<String, dynamic> toJson() => {
-              'id': id,
-              'name': name,
-              'dose': dose,
-              'frequency': frequency,
-              'takenToday': takenToday,
-              'date': todayKey(),
+              'id': id, 'name': name, 'dose': dose, 'frequency': frequency, 'takenToday': takenToday, 'date': todayKey(),
             };
 
             static Med fromJson(Map<String, dynamic> j) => Med(
@@ -95,13 +126,46 @@ jobs:
             return '${d.year}-${d.month}-${d.day}';
           }
 
-          class HomePage extends StatefulWidget {
-            const HomePage({super.key});
+          // --- 主界面（带底部导航） ---
+          class MainScreen extends StatefulWidget {
+            const MainScreen({super.key});
             @override
-            State<HomePage> createState() => _HomePageState();
+            State<MainScreen> createState() => _MainScreenState();
           }
 
-          class _HomePageState extends State<HomePage> {
+          class _MainScreenState extends State<MainScreen> {
+            int _currentIndex = 0;
+            final List<Widget> _pages = [
+              const MyMedsPage(),
+              const DrugSearchPage(),
+            ];
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                body: _pages[_currentIndex],
+                bottomNavigationBar: NavigationBar(
+                  selectedIndex: _currentIndex,
+                  onDestinationSelected: (index) {
+                    setState(() => _currentIndex = index);
+                  },
+                  destinations: const [
+                    NavigationDestination(icon: Icon(Icons.checklist), label: '我的用药'),
+                    NavigationDestination(icon: Icon(Icons.search), label: '药品查询'),
+                  ],
+                ),
+              );
+            }
+          }
+
+          // --- 页面 1：我的用药打卡 ---
+          class MyMedsPage extends StatefulWidget {
+            const MyMedsPage({super.key});
+            @override
+            State<MyMedsPage> createState() => _MyMedsPageState();
+          }
+
+          class _MyMedsPageState extends State<MyMedsPage> {
             final List<Med> meds = [];
             final nameCtrl = TextEditingController();
             final doseCtrl = TextEditingController();
@@ -174,10 +238,7 @@ jobs:
                   actions: [
                     TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
                     FilledButton(
-                      onPressed: () {
-                        addMed();
-                        Navigator.pop(ctx);
-                      },
+                      onPressed: () { addMed(); Navigator.pop(ctx); },
                       child: const Text('保存'),
                     ),
                   ],
@@ -187,21 +248,16 @@ jobs:
 
             @override
             Widget build(BuildContext context) {
-              if (loading) {
-                return const Scaffold(body: Center(child: CircularProgressIndicator()));
-              }
+              if (loading) return const Center(child: CircularProgressIndicator());
               return Scaffold(
-                appBar: AppBar(title: const Text('用药助手（本地版）')),
+                appBar: AppBar(title: const Text('我的用药')),
                 body: Column(
                   children: [
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       color: Colors.amber.shade100,
-                      child: const Text(
-                        '免责声明：本应用仅用于个人用药记录，不提供诊断或用药建议。用药请遵医嘱。',
-                        style: TextStyle(fontSize: 12),
-                      ),
+                      child: const Text('免责声明：本应用仅用于个人用药记录，不提供诊断或用药建议。用药请遵医嘱。', style: TextStyle(fontSize: 12)),
                     ),
                     Expanded(
                       child: meds.isEmpty
@@ -212,18 +268,10 @@ jobs:
                                 final m = meds[i];
                                 return Card(
                                   child: ListTile(
-                                    leading: Checkbox(
-                                      value: m.takenToday,
-                                      onChanged: (_) => toggle(m),
-                                    ),
+                                    leading: Checkbox(value: m.takenToday, onChanged: (_) => toggle(m)),
                                     title: Text(m.name),
-                                    subtitle: Text(
-                                      [m.dose, m.frequency].where((e) => e.isNotEmpty).join(' · '),
-                                    ),
-                                    trailing: IconButton(
-                                      icon: const Icon(Icons.delete_outline),
-                                      onPressed: () => delete(m),
-                                    ),
+                                    subtitle: Text([m.dose, m.frequency].where((e) => e.isNotEmpty).join(' · ')),
+                                    trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => delete(m)),
                                   ),
                                 );
                               },
@@ -231,9 +279,77 @@ jobs:
                     ),
                   ],
                 ),
-                floatingActionButton: FloatingActionButton(
-                  onPressed: showAddDialog,
-                  child: const Icon(Icons.add),
+                floatingActionButton: FloatingActionButton(onPressed: showAddDialog, child: const Icon(Icons.add)),
+              );
+            }
+          }
+
+          // --- 页面 2：药品查询 ---
+          class DrugSearchPage extends StatefulWidget {
+            const DrugSearchPage({super.key});
+            @override
+            State<DrugSearchPage> createState() => _DrugSearchPageState();
+          }
+
+          class _DrugSearchPageState extends State<DrugSearchPage> {
+            String searchQuery = '';
+
+            @override
+            Widget build(BuildContext context) {
+              final results = drugDatabase.where((drug) => 
+                drug['name']!.contains(searchQuery) || drug['type']!.contains(searchQuery)
+              ).toList();
+
+              return Scaffold(
+                appBar: AppBar(title: const Text('药品说明书查询')),
+                body: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: '输入药名查询，如：布洛芬',
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onChanged: (val) {
+                          setState(() => searchQuery = val.trim());
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: results.length,
+                        itemBuilder: (ctx, i) {
+                          final drug = results[i];
+                          return Card(
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: ExpansionTile(
+                              title: Text(drug['name']!, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(drug['type']!, style: TextStyle(color: Colors.teal.shade700)),
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('【适应症/功能主治】', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 4),
+                                      Text(drug['warning']!),
+                                      const SizedBox(height: 12),
+                                      const Text('【用法用量】', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 4),
+                                      Text(drug['usage']!),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               );
             }
