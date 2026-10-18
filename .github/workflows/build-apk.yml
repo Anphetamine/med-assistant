@@ -250,3 +250,12 @@ jobs:
         with:
           name: med-assistant-debug-apk
           path: app/build/app/outputs/flutter-apk/app-debug.apk
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+       tag_name: v1.0.${{ github.run_number }}
+       name: 用药助手 v1.0.${{ github.run_number }}
+       files: app/build/app/outputs/flutter-apk/app-debug.apk
+       env:
+       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
